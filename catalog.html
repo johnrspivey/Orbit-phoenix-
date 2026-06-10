@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Manifest — Bitwerx Catalog</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@500;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#0b1520;
+    --ink-2:#101d2c;
+    --paper:#e8dfc8;
+    --paper-dim:#9aa3a8;
+    --live:#3fb57b;
+    --built:#e0a93e;
+    --building:#5ba3c9;
+    --concept:#9b8ec4;
+    --standing:#d97c5f;
+    --parked:#5a6470;
+    --rule:rgba(232,223,200,.12);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth}
+  body{
+    background:var(--ink);
+    color:var(--paper);
+    font-family:'IBM Plex Sans',sans-serif;
+    font-size:15px;
+    line-height:1.45;
+    min-height:100vh;
+  }
+  /* ---------- header ---------- */
+  header{
+    position:sticky;top:0;z-index:10;
+    background:linear-gradient(var(--ink) 82%, rgba(11,21,32,0));
+    padding:18px 16px 10px;
+  }
+  .masthead{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+  h1{
+    font-family:'Big Shoulders Display',sans-serif;
+    font-weight:700;font-size:30px;letter-spacing:.04em;
+    text-transform:uppercase;
+  }
+  .total{
+    font-family:'IBM Plex Mono',monospace;font-size:13px;
+    color:var(--paper-dim);
+  }
+  .updated{
+    font-family:'IBM Plex Mono',monospace;font-size:11px;
+    color:var(--paper-dim);width:100%;
+  }
+  /* ---------- filters ---------- */
+  .filters{
+    display:flex;gap:8px;overflow-x:auto;padding:12px 0 4px;
+    scrollbar-width:none;
+  }
+  .filters::-webkit-scrollbar{display:none}
+  .chip{
+    flex:0 0 auto;
+    font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:500;
+    color:var(--paper);background:none;
+    border:1px solid var(--rule);border-radius:3px;
+    padding:6px 11px;cursor:pointer;
+    display:flex;align-items:center;gap:7px;
+    transition:border-color .15s,opacity .15s;
+  }
+  .chip .lamp{width:8px;height:8px;border-radius:50%;background:var(--c)}
+  .chip .n{color:var(--paper-dim)}
+  .chip[aria-pressed="true"]{border-color:var(--c);background:rgba(232,223,200,.05)}
+  .chip:focus-visible{outline:2px solid var(--paper);outline-offset:2px}
+  .search{
+    width:100%;margin-top:10px;
+    background:var(--ink-2);color:var(--paper);
+    border:1px solid var(--rule);border-radius:3px;
+    font-family:'IBM Plex Mono',monospace;font-size:13px;
+    padding:10px 12px;
+  }
+  .search::placeholder{color:var(--paper-dim)}
+  .search:focus{outline:none;border-color:var(--paper-dim)}
+  /* ---------- log ---------- */
+  main{padding:6px 16px 80px;max-width:760px;margin:0 auto}
+  .section{margin-top:26px}
+  .section>h2{
+    font-family:'Big Shoulders Display',sans-serif;
+    font-weight:500;font-size:15px;letter-spacing:.18em;
+    text-transform:uppercase;color:var(--c,var(--paper-dim));
+    border-bottom:1px solid var(--rule);
+    padding-bottom:6px;display:flex;justify-content:space-between;
+  }
+  .section>h2 .count{font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--paper-dim)}
+  .entry{
+    display:flex;gap:11px;align-items:flex-start;
+    padding:11px 0;border-bottom:1px solid var(--rule);
+  }
+  .entry .lamp{
+    flex:0 0 8px;width:8px;height:8px;border-radius:50%;
+    background:var(--c);margin-top:6px;
+    box-shadow:0 0 6px 0 var(--c);
+  }
+  .entry .name{font-weight:600;font-size:14px}
+  .entry .desc{
+    font-size:13px;color:var(--paper-dim);margin-top:2px;
+  }
+  .empty{
+    padding:40px 0;text-align:center;color:var(--paper-dim);
+    font-family:'IBM Plex Mono',monospace;font-size:13px;
+  }
+  .err{
+    margin:40px auto;max-width:520px;padding:18px;
+    border:1px solid var(--rule);border-radius:4px;
+    font-family:'IBM Plex Mono',monospace;font-size:13px;color:var(--paper-dim);
+  }
+  @media (prefers-reduced-motion:no-preference){
+    .entry{animation:rise .25s ease both}
+    @keyframes rise{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="masthead">
+    <h1>The Manifest</h1>
+    <span class="total" id="total"></span>
+    <span class="updated" id="updated"></span>
+  </div>
+  <div class="filters" id="filters" role="group" aria-label="Filter by status"></div>
+  <input class="search" id="search" type="search" placeholder="search the catalog…" aria-label="Search the catalog">
+</header>
+<main id="log"></main>
+
+<script>
+// THE MANIFEST reads CATALOG.md from the same deploy.
+// CATALOG.md is the single source of truth — never edit data here.
+
+const STATUSES = [
+  {key:'LIVE',          match:/^##\s*LIVE/i,                 label:'Live',     color:'var(--live)'},
+  {key:'BUILT',         match:/^##\s*BUILT/i,                label:'Built',    color:'var(--built)'},
+  {key:'BUILDING',      match:/^##\s*BUILDING/i,             label:'Building', color:'var(--building)'},
+  {key:'CONCEPT',       match:/^##\s*CONCEPTS?/i,            label:'Concept',  color:'var(--concept)'},
+  {key:'STANDING',      match:/^##\s*STANDING/i,             label:'Standing', color:'var(--standing)'},
+  {key:'PARKED',        match:/^##\s*PARKED/i,               label:'Parked',   color:'var(--parked)'},
+];
+
+let sections = [];           // [{key,label,color,title,items:[{name,desc}]}]
+let active = new Set();      // active status keys ('' = all)
+let query = '';
+
+function parseCatalog(md){
+  const lines = md.split('\n');
+  const out = [];
+  let cur = null, updated = '';
+  for (const raw of lines){
+    const line = raw.trim();
+    const upd = line.match(/last full update:\s*(.+)$/i);
+    if (upd) updated = upd[1].trim();
+    if (line.startsWith('## ')){
+      const st = STATUSES.find(s => s.match.test(line));
+      cur = st ? {...st, title:line.replace(/^##\s*/,''), items:[]} : null;
+      if (cur) out.push(cur);
+      continue;
+    }
+    if (cur && line.startsWith('- ')){
+      const body = line.slice(2);
+      const m = body.match(/\*\*(.+?)\*\*\s*(?:—|-)?\s*(.*)/);
+      if (m) cur.items.push({name:m[1], desc:m[2].replace(/—\s*\w+\s*(\(.*\))?$/,'').trim()});
+      else cur.items.push({name:body, desc:''});
+    }
+  }
+  return {sections:out, updated};
+}
+
+function render(){
+  const log = document.getElementById('log');
+  log.innerHTML = '';
+  let shown = 0;
+  for (const sec of sections){
+    if (active.size && !active.has(sec.key)) continue;
+    const items = sec.items.filter(it =>
+      !query || (it.name+' '+it.desc).toLowerCase().includes(query));
+    if (!items.length) continue;
+    shown += items.length;
+    const el = document.createElement('section');
+    el.className = 'section';
+    el.style.setProperty('--c', sec.color);
+    el.innerHTML = `<h2>${sec.title}<span class="count">${items.length}</span></h2>`;
+    for (const it of items){
+      const row = document.createElement('div');
+      row.className = 'entry';
+      row.style.setProperty('--c', sec.color);
+      row.innerHTML = `<span class="lamp" aria-hidden="true"></span>
+        <div><div class="name">${it.name}</div>
+        ${it.desc ? `<div class="desc">${it.desc}</div>` : ''}</div>`;
+      el.appendChild(row);
+    }
+    log.appendChild(el);
+  }
+  if (!shown) log.innerHTML = '<div class="empty">nothing in the manifest matches</div>';
+  const totalAll = sections.reduce((n,s)=>n+s.items.length,0);
+  document.getElementById('total').textContent =
+    query || active.size ? `${shown} of ${totalAll} entries` : `${totalAll} entries`;
+}
+
+function buildFilters(){
+  const wrap = document.getElementById('filters');
+  for (const st of STATUSES){
+    const sec = sections.find(s => s.key === st.key);
+    if (!sec || !sec.items.length) continue;
+    const b = document.createElement('button');
+    b.className = 'chip';
+    b.style.setProperty('--c', st.color);
+    b.setAttribute('aria-pressed','false');
+    b.innerHTML = `<span class="lamp" aria-hidden="true"></span>${st.label} <span class="n">${sec.items.length}</span>`;
+    b.onclick = () => {
+      active.has(st.key) ? active.delete(st.key) : active.add(st.key);
+      b.setAttribute('aria-pressed', active.has(st.key));
+      render();
+    };
+    wrap.appendChild(b);
+  }
+}
+
+document.getElementById('search').addEventListener('input', e=>{
+  query = e.target.value.toLowerCase().trim();
+  render();
+});
+
+fetch('./CATALOG.md')
+  .then(r => { if(!r.ok) throw new Error('HTTP '+r.status); return r.text(); })
+  .then(md => {
+    const parsed = parseCatalog(md);
+    sections = parsed.sections;
+    if (parsed.updated)
+      document.getElementById('updated').textContent = 'updated ' + parsed.updated;
+    buildFilters();
+    render();
+  })
+  .catch(err => {
+    document.getElementById('log').innerHTML =
+      `<div class="err">Couldn't load CATALOG.md (${err.message}).<br><br>
+       This page must be deployed in the same folder as CATALOG.md —
+       it reads that file as its only data source.</div>`;
+  });
+</script>
+</body>
+</html>
