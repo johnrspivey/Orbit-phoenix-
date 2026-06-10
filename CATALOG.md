@@ -14,7 +14,7 @@
 - **Content Quarry** — contentquarry.gigpig.online, YouTube channel → course curriculum — LIVE
 - **850420.com** — FL MMJ affiliate, ICM pipeline live, affiliate links active — LIVE
 - **Merchant Monitor** — revenue-ready — LIVE
-- **Skipper MCP** — 5 tools, runs the operation — LIVE
+- **Skipper MCP** — 5 tools, SHA bug fixed, source backed up to GitHub (skipper/server.js) — LIVE
 - **Periscope** — nav crawler + signals API, code pushed, deploy pending — BUILT (June 9)
 - **Fiverr Gig 1** — AI Content System, published — LIVE
 - **Mission Control / lab.bitwerxlabs.com / uniquetools / yafeelme / Bible Speak / Best Price Tires** — deployed earlier builds — LIVE
@@ -27,10 +27,10 @@
 - **PageForge / CommentIQ / MOO / CourseForge / DopeSonic / Warrior Scanner deployment kits** — production-ready kits with paywalls, on the shelf
 
 ## BUILDING / ACTIVE PIPELINE
-- **Skipper self-repair** — SSH migration checklist in repo; then SHA fix, self_update, Lifeboat, create_repo, send_email
+- **Skipper self-repair** — SSH migration done; SHA fix SHIPPED (June 10); next: self_update, Lifeboat, create_repo, send_email
 - **Skipper tool expansion** — Stripe, Supabase, email, Telegram push first; Cloudflare/Namecheap later
 - **PROJECT.md at all repo roots** — highest-value ICM step, pending
-- **Health monitoring** — /health + UptimeRobot + Telegram across products, pending
+- **Health monitoring** — /health + UptimeRobot + Telegram across products, pending; Best Price Tires queued
 - **GNN Episode 1** — pilot script written; production pipeline undefined
 - **DC Dogs** — series bible complete (Word doc); pipeline undefined
 - **EverFresh** — concept brief done; PROVISIONAL PATENT NOT FILED (~$320, do before wider sharing)
