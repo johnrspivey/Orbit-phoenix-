@@ -1,0 +1,4 @@
+[build]
+  base = "contentforge"
+  publish = "."
+  functions = "netlify/functions"

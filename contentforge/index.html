@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ContentForge — AI Content System Demo</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #0D0D0D;
+    --paper: #F7F5F0;
+    --forge: #C84B31;
+    --forge-dim: #8C3420;
+    --steel: #2A2A2A;
+    --mist: #E8E4DC;
+    --ash: #9A9590;
+    --wire: #3D3D3D;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Space Grotesk', sans-serif; background: var(--ink); color: var(--paper); min-height: 100vh; overflow-x: hidden; }
+  header { border-bottom: 1px solid var(--wire); padding: 20px 40px; display: flex; align-items: center; justify-content: space-between; }
+  .logo { font-family: 'Space Mono', monospace; font-size: 1.1rem; font-weight: 700; letter-spacing: -0.02em; color: var(--paper); }
+  .logo span { color: var(--forge); }
+  .logo-sub { font-family: 'Space Mono', monospace; font-size: 0.65rem; color: var(--ash); letter-spacing: 0.15em; text-transform: uppercase; margin-top: 2px; }
+  .badge { font-family: 'Space Mono', monospace; font-size: 0.65rem; color: var(--forge); border: 1px solid var(--forge-dim); padding: 4px 10px; letter-spacing: 0.1em; text-transform: uppercase; }
+  .hero { padding: 80px 40px 60px; max-width: 800px; margin: 0 auto; text-align: center; }
+  .hero-eyebrow { font-family: 'Space Mono', monospace; font-size: 0.7rem; color: var(--forge); letter-spacing: 0.2em; text-transform: uppercase; margin-bottom: 24px; }
+  .hero h1 { font-size: clamp(2rem, 5vw, 3.5rem); font-weight: 700; line-height: 1.1; letter-spacing: -0.03em; margin-bottom: 20px; }
+  .hero h1 em { font-style: normal; color: var(--forge); }
+  .hero p { font-size: 1.1rem; color: var(--ash); line-height: 1.7; max-width: 560px; margin: 0 auto 16px; }
+  .free-note { font-family: 'Space Mono', monospace; font-size: 0.7rem; color: var(--ash); letter-spacing: 0.05em; }
+  .free-note strong { color: var(--paper); }
+  .forge-card { max-width: 800px; margin: 0 auto 80px; padding: 0 40px; }
+  #gate-section { background: var(--steel); border: 1px solid var(--wire); padding: 48px; }
+  #gate-section h2 { font-size: 1.4rem; font-weight: 600; margin-bottom: 8px; letter-spacing: -0.02em; }
+  #gate-section p { color: var(--ash); font-size: 0.95rem; margin-bottom: 32px; line-height: 1.6; }
+  .input-row { display: flex; gap: 12px; margin-bottom: 16px; }
+  .field-wrap { flex: 1; }
+  .field-label { font-family: 'Space Mono', monospace; font-size: 0.65rem; color: var(--ash); letter-spacing: 0.12em; text-transform: uppercase; display: block; margin-bottom: 8px; }
+  input[type="email"], input[type="text"], textarea { width: 100%; background: var(--ink); border: 1px solid var(--wire); color: var(--paper); font-family: 'Space Grotesk', sans-serif; font-size: 1rem; padding: 14px 16px; outline: none; transition: border-color 0.2s; }
+  input[type="email"]:focus, input[type="text"]:focus, textarea:focus { border-color: var(--forge); }
+  textarea { resize: vertical; min-height: 80px; }
+  .promo-toggle { font-family: 'Space Mono', monospace; font-size: 0.7rem; color: var(--ash); cursor: pointer; text-decoration: underline; background: none; border: none; padding: 0; letter-spacing: 0.05em; margin-bottom: 16px; display: inline-block; }
+  .promo-toggle:hover { color: var(--paper); }
+  #promo-row { display: none; margin-bottom: 16px; }
+  #promo-row.visible { display: flex; }
+  .btn-primary { background: var(--forge); color: var(--paper); border: none; font-family: 'Space Grotesk', sans-serif; font-size: 1rem; font-weight: 600; padding: 14px 32px; cursor: pointer; letter-spacing: 0.02em; transition: background 0.2s; white-space: nowrap; }
+  .btn-primary:hover:not(:disabled) { background: var(--forge-dim); }
+  .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+  .gate-note { font-size: 0.8rem; color: var(--ash); margin-top: 12px; line-height: 1.5; }
+  .error-msg { color: #E05A3A; font-size: 0.85rem; margin-top: 8px; font-family: 'Space Mono', monospace; }
+  #tool-section { display: none; }
+  #tool-section.visible { display: block; }
+  .usage-bar { background: var(--steel); border: 1px solid var(--wire); border-bottom: none; padding: 14px 24px; display: flex; align-items: center; justify-content: space-between; }
+  .usage-label { font-family: 'Space Mono', monospace; font-size: 0.7rem; color: var(--ash); letter-spacing: 0.1em; text-transform: uppercase; }
+  .usage-count { font-family: 'Space Mono', monospace; font-size: 0.75rem; color: var(--forge); }
+  .tool-body { background: var(--steel); border: 1px solid var(--wire); padding: 40px; }
+  .tool-body h2 { font-size: 1.3rem; font-weight: 600; letter-spacing: -0.02em; margin-bottom: 6px; }
+  .tool-body > p { color: var(--ash); font-size: 0.9rem; margin-bottom: 28px; }
+  .topic-wrap { margin-bottom: 20px; }
+  .topic-hint { font-size: 0.8rem; color: var(--ash); margin-top: 8px; }
+  .topic-examples { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+  .example-pill { font-size: 0.78rem; color: var(--ash); border: 1px solid var(--wire); padding: 5px 12px; cursor: pointer; transition: all 0.15s; font-family: 'Space Mono', monospace; }
+  .example-pill:hover { border-color: var(--forge); color: var(--paper); }
+  .generate-row { display: flex; gap: 12px; align-items: flex-end; margin-bottom: 32px; }
+  .generate-row .field-wrap { flex: 1; }
+  .output-section { display: none; }
+  .output-section.visible { display: block; }
+  .tab-bar { display: flex; border-bottom: 1px solid var(--wire); margin-bottom: 0; }
+  .tab-btn { font-family: 'Space Mono', monospace; font-size: 0.72rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ash); background: none; border: none; border-bottom: 2px solid transparent; padding: 12px 20px; cursor: pointer; transition: all 0.15s; margin-bottom: -1px; }
+  .tab-btn.active { color: var(--paper); border-bottom-color: var(--forge); }
+  .tab-btn:hover:not(.active) { color: var(--paper); }
+  .tab-content { display: none; background: var(--ink); border: 1px solid var(--wire); border-top: none; padding: 32px; }
+  .tab-content.active { display: block; }
+  .output-text { font-size: 0.95rem; line-height: 1.8; color: var(--paper); white-space: pre-wrap; font-family: 'Space Grotesk', sans-serif; }
+  .output-text h1, .output-text h2, .output-text h3 { margin: 1.2em 0 0.4em; font-weight: 700; letter-spacing: -0.02em; color: var(--paper); }
+  .output-text h1 { font-size: 1.5rem; }
+  .output-text h2 { font-size: 1.2rem; color: var(--forge); }
+  .output-text h3 { font-size: 1rem; }
+  .copy-btn { font-family: 'Space Mono', monospace; font-size: 0.65rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ash); background: none; border: 1px solid var(--wire); padding: 8px 16px; cursor: pointer; transition: all 0.15s; margin-top: 20px; }
+  .copy-btn:hover { border-color: var(--forge); color: var(--paper); }
+  .copy-btn.copied { color: #4CAF50; border-color: #4CAF50; }
+  .loading-state { display: none; text-align: center; padding: 60px 0; }
+  .loading-state.visible { display: block; }
+  .forge-spinner { width: 40px; height: 40px; border: 2px solid var(--wire); border-top-color: var(--forge); border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 20px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .loading-label { font-family: 'Space Mono', monospace; font-size: 0.75rem; color: var(--ash); letter-spacing: 0.1em; }
+  .loading-steps { margin-top: 16px; font-size: 0.8rem; color: var(--ash); }
+  .upsell-bar { display: none; background: linear-gradient(135deg, var(--forge-dim), #4A1A0A); border: 1px solid var(--forge); padding: 24px 32px; margin-top: 24px; text-align: center; }
+  .upsell-bar.visible { display: block; }
+  .upsell-bar h3 { font-size: 1.1rem; font-weight: 600; margin-bottom: 8px; }
+  .upsell-bar p { color: rgba(247,245,240,0.75); font-size: 0.9rem; margin-bottom: 16px; }
+  .btn-outline { background: none; border: 1px solid var(--paper); color: var(--paper); font-family: 'Space Grotesk', sans-serif; font-size: 0.9rem; font-weight: 600; padding: 10px 24px; cursor: pointer; transition: all 0.2s; }
+  .btn-outline:hover { background: var(--paper); color: var(--ink); }
+  footer { border-top: 1px solid var(--wire); padding: 24px 40px; text-align: center; }
+  .footer-text { font-family: 'Space Mono', monospace; font-size: 0.65rem; color: var(--ash); letter-spacing: 0.1em; text-transform: uppercase; }
+  .footer-text a { color: var(--forge); text-decoration: none; }
+  @media (max-width: 600px) {
+    header { padding: 16px 20px; }
+    .hero { padding: 48px 20px 40px; }
+    .forge-card { padding: 0 20px; }
+    #gate-section { padding: 28px 24px; }
+    .tool-body { padding: 28px 24px; }
+    .input-row { flex-direction: column; }
+    .generate-row { flex-direction: column; }
+    .tab-content { padding: 20px; }
+    .usage-bar { padding: 12px 20px; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <div class="logo">Content<span>Forge</span></div>
+    <div class="logo-sub">by Bitwerx Labs</div>
+  </div>
+  <div class="badge">Live Demo</div>
+</header>
+<div class="hero">
+  <div class="hero-eyebrow">AI Content Production System</div>
+  <h1>Enter a topic.<br><em>Get a complete article.</em><br>Or a content brief.</h1>
+  <p>The same system Bitwerx Labs builds for bloggers — configured, documented, and ready to run. Try it yourself.</p>
+  <p class="free-note"><strong>3 free generations</strong> per account &nbsp;·&nbsp; No credit card &nbsp;·&nbsp; Both outputs included</p>
+</div>
+<div class="forge-card">
+  <div id="gate-section">
+    <h2>Start generating</h2>
+    <p>Enter your email to get 3 free article and brief generations. No credit card. No spam — just your results.</p>
+    <div class="input-row">
+      <div class="field-wrap">
+        <label class="field-label" for="email-input">Your email</label>
+        <input type="email" id="email-input" placeholder="you@yourblog.com" autocomplete="email">
+      </div>
+      <button class="btn-primary" id="gate-btn" onclick="handleGate()" style="align-self: flex-end;">Get Access</button>
+    </div>
+    <button class="promo-toggle" onclick="togglePromo()">Have a promo code?</button>
+    <div id="promo-row" class="input-row">
+      <div class="field-wrap">
+        <label class="field-label" for="promo-input">Promo code</label>
+        <input type="text" id="promo-input" placeholder="Enter code" autocomplete="off">
+      </div>
+    </div>
+    <div id="gate-error" class="error-msg"></div>
+    <p class="gate-note">We'll remember your email so you don't have to re-enter it. Your 3 free generations reset every 24 hours.</p>
+  </div>
+  <div id="tool-section">
+    <div class="usage-bar">
+      <span class="usage-label">Free generations remaining today</span>
+      <span class="usage-count" id="usage-display">3 / 3</span>
+    </div>
+    <div class="tool-body">
+      <h2>What do you want to write about?</h2>
+      <p>Enter any blog topic — as broad or specific as you want. ContentForge generates a full article AND a content brief.</p>
+      <div class="topic-wrap">
+        <label class="field-label" for="topic-input">Your topic</label>
+        <textarea id="topic-input" placeholder="e.g. How to start a keto diet on a tight budget" rows="3"></textarea>
+        <p class="topic-hint">Try to be specific. The more context you give, the better the output.</p>
+        <div class="topic-examples">
+          <span class="example-pill" onclick="setTopic(this)">Best air fryer tips for beginners</span>
+          <span class="example-pill" onclick="setTopic(this)">How to sail solo for the first time</span>
+          <span class="example-pill" onclick="setTopic(this)">Building passive income as a freelancer</span>
+          <span class="example-pill" onclick="setTopic(this)">Keto meal prep for one person</span>
+          <span class="example-pill" onclick="setTopic(this)">How to set up a Fiverr gig that converts</span>
+        </div>
+      </div>
+      <div class="generate-row">
+        <button class="btn-primary" id="generate-btn" onclick="generate()">Generate Article + Brief</button>
+      </div>
+      <div class="loading-state" id="loading">
+        <div class="forge-spinner"></div>
+        <div class="loading-label">Forging your content...</div>
+        <div class="loading-steps" id="loading-step">Analyzing topic and building structure</div>
+      </div>
+      <div class="output-section" id="output-section">
+        <div class="tab-bar">
+          <button class="tab-btn active" onclick="switchTab('article', this)">Full Article</button>
+          <button class="tab-btn" onclick="switchTab('brief', this)">Content Brief</button>
+        </div>
+        <div class="tab-content active" id="tab-article">
+          <div class="output-text" id="article-output"></div>
+          <button class="copy-btn" onclick="copyOutput('article-output', this)">Copy Article</button>
+        </div>
+        <div class="tab-content" id="tab-brief">
+          <div class="output-text" id="brief-output"></div>
+          <button class="copy-btn" onclick="copyOutput('brief-output', this)">Copy Brief</button>
+        </div>
+      </div>
+      <div class="upsell-bar" id="upsell-bar">
+        <h3>Want this running on autopilot for your blog?</h3>
+        <p>We build custom content systems — topic engines, drafting workflows, publishing rhythms — configured for your niche. Done for you.</p>
+        <button class="btn-outline" onclick="window.open('https://bitwerxlabs.com', '_blank')">See How It Works →</button>
+      </div>
+    </div>
+  </div>
+</div>
+<footer>
+  <div class="footer-text">
+    ContentForge &nbsp;·&nbsp; <a href="https://bitwerxlabs.com">Bitwerx Labs</a> &nbsp;·&nbsp; A demo of what we build for bloggers
+  </div>
+</footer>
+<script>
+const PROMO_CODES = {
+  'BITWERX': { type: 'permanent', uses: Infinity },
+  'FRIENDS': { type: 'permanent', uses: Infinity },
+  'FAMILY':  { type: 'permanent', uses: Infinity },
+  'DEMO30':  { type: 'limited',   uses: 30 },
+  'PARTNER': { type: 'permanent', uses: Infinity },
+};
+const FREE_USES_PER_DAY = 3;
+let userEmail = '';
+let isPromo = false;
+let promoCode = '';
+let usesRemaining = FREE_USES_PER_DAY;
+let currentArticle = '';
+let currentBrief = '';
+function getUsageKey(email) { return 'cf_usage_' + email + '_' + new Date().toDateString(); }
+function getUsesRemaining(email, isPromoUser) {
+  if (isPromoUser) return Infinity;
+  const key = getUsageKey(email);
+  const used = parseInt(sessionStorage.getItem(key) || '0');
+  return Math.max(0, FREE_USES_PER_DAY - used);
+}
+function recordUse(email, isPromoUser) {
+  if (isPromoUser) return;
+  const key = getUsageKey(email);
+  const used = parseInt(sessionStorage.getItem(key) || '0');
+  sessionStorage.setItem(key, used + 1);
+}
+function getSavedEmail() { try { return localStorage.getItem('cf_email') || ''; } catch { return ''; } }
+function saveEmail(email) { try { localStorage.setItem('cf_email', email); } catch {} }
+function togglePromo() { document.getElementById('promo-row').classList.toggle('visible'); }
+function handleGate() {
+  const emailEl = document.getElementById('email-input');
+  const promoEl = document.getElementById('promo-input');
+  const errEl   = document.getElementById('gate-error');
+  const btn     = document.getElementById('gate-btn');
+  errEl.textContent = '';
+  const email = emailEl.value.trim().toLowerCase();
+  const code  = promoEl.value.trim().toUpperCase();
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    errEl.textContent = 'Please enter a valid email address.';
+    return;
+  }
+  if (code) {
+    if (!PROMO_CODES[code]) { errEl.textContent = "That promo code isn't valid. Check for typos."; return; }
+    isPromo = true;
+    promoCode = code;
+  }
+  userEmail = email;
+  saveEmail(email);
+  usesRemaining = getUsesRemaining(email, isPromo);
+  btn.disabled = true;
+  btn.textContent = 'Access granted';
+  showTool();
+}
+function showTool() {
+  document.getElementById('gate-section').style.display = 'none';
+  document.getElementById('tool-section').classList.add('visible');
+  updateUsageDisplay();
+}
+function updateUsageDisplay() {
+  const display = document.getElementById('usage-display');
+  if (isPromo) {
+    display.textContent = '∞ (promo)';
+    display.style.color = '#4CAF50';
+  } else {
+    const remaining = getUsesRemaining(userEmail, false);
+    display.textContent = remaining + ' / ' + FREE_USES_PER_DAY;
+    display.style.color = remaining > 0 ? 'var(--forge)' : '#E05A3A';
+  }
+}
+function setTopic(el) { document.getElementById('topic-input').value = el.textContent; }
+async function generate() {
+  const topic = document.getElementById('topic-input').value.trim();
+  if (!topic) { alert('Please enter a topic first.'); return; }
+  const remaining = getUsesRemaining(userEmail, isPromo);
+  if (!isPromo && remaining <= 0) { showUpsell(); return; }
+  document.getElementById('generate-btn').disabled = true;
+  document.getElementById('output-section').classList.remove('visible');
+  document.getElementById('loading').classList.add('visible');
+  document.getElementById('upsell-bar').classList.remove('visible');
+  const steps = [
+    'Analyzing topic and audience intent...',
+    'Building article structure...',
+    'Drafting full article...',
+    'Generating content brief...',
+    'Polishing output...',
+  ];
+  let stepIdx = 0;
+  const stepEl = document.getElementById('loading-step');
+  const stepInterval = setInterval(() => {
+    stepIdx = (stepIdx + 1) % steps.length;
+    stepEl.textContent = steps[stepIdx];
+  }, 1800);
+  try {
+    const [articleResult, briefResult] = await Promise.all([
+      callClaude(articlePrompt(topic)),
+      callClaude(briefPrompt(topic))
+    ]);
+    currentArticle = articleResult;
+    currentBrief   = briefResult;
+    document.getElementById('article-output').innerHTML = formatOutput(articleResult);
+    document.getElementById('brief-output').innerHTML   = formatOutput(briefResult);
+    recordUse(userEmail, isPromo);
+    updateUsageDisplay();
+    clearInterval(stepInterval);
+    document.getElementById('loading').classList.remove('visible');
+    document.getElementById('output-section').classList.add('visible');
+    if (!isPromo && getUsesRemaining(userEmail, false) <= 0) { setTimeout(showUpsell, 1500); }
+  } catch (err) {
+    clearInterval(stepInterval);
+    document.getElementById('loading').classList.remove('visible');
+    alert('Something went wrong generating your content. Please try again.');
+    console.error(err);
+  }
+  document.getElementById('generate-btn').disabled = false;
+}
+async function callClaude(prompt) {
+  const response = await fetch('/.netlify/functions/generate', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ prompt })
+  });
+  if (!response.ok) throw new Error('API error: ' + response.status);
+  const data = await response.json();
+  return data.content?.[0]?.text || '';
+}
+function articlePrompt(topic) {
+  return 'You are an expert blog writer. Write a complete, polished, SEO-optimized blog article on the following topic:\n\nTOPIC: ' + topic + '\n\nRequirements:\n- Compelling H1 headline\n- Engaging introduction\n- 4-6 well-structured sections with H2 subheadings\n- Each section: 2-3 substantive paragraphs\n- Conversational but authoritative tone\n- Concrete examples and actionable steps\n- Strong conclusion\n- Meta description at the end (155 characters max)\n\nWrite at least 900 words. No filler.';
+}
+function briefPrompt(topic) {
+  return 'You are a content strategist. Create a detailed content brief for a blog article on the following topic:\n\nTOPIC: ' + topic + '\n\nInclude: target keyword, secondary keywords, search intent, target reader, word count, H1 title, meta description, section outline with H2s and bullet points, key points, tone guidance, and call to action. Make it detailed enough that any writer could produce an excellent article from it.';
+}
+function formatOutput(text) {
+  return text
+    .replace(/^# (.+)$/gm, '<h1>$1</h1>')
+    .replace(/^## (.+)$/gm, '<h2>$1</h2>')
+    .replace(/^### (.+)$/gm, '<h3>$1</h3>')
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*(.+?)\*/g, '<em>$1</em>')
+    .replace(/^- (.+)$/gm, '• $1')
+    .replace(/\n\n/g, '<br><br>')
+    .replace(/\n/g, '<br>');
+}
+function switchTab(tab, btn) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('tab-' + tab).classList.add('active');
+}
+function copyOutput(id, btn) {
+  const text = document.getElementById(id).innerText;
+  navigator.clipboard.writeText(text).then(() => {
+    btn.textContent = '✓ Copied';
+    btn.classList.add('copied');
+    setTimeout(() => {
+      btn.textContent = id.includes('article') ? 'Copy Article' : 'Copy Brief';
+      btn.classList.remove('copied');
+    }, 2000);
+  });
+}
+function showUpsell() { document.getElementById('upsell-bar').classList.add('visible'); }
+window.addEventListener('DOMContentLoaded', () => {
+  const saved = getSavedEmail();
+  if (saved) document.getElementById('email-input').value = saved;
+});
+</script>
+</body>
+</html>
