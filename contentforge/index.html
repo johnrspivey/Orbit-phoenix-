@@ -293,10 +293,8 @@ async function generate() {
     stepEl.textContent = steps[stepIdx];
   }, 1800);
   try {
-    const [articleResult, briefResult] = await Promise.all([
-      callClaude(articlePrompt(topic)),
-      callClaude(briefPrompt(topic))
-    ]);
+    const articleResult = await callClaude(articlePrompt(topic));
+    const briefResult = await callClaude(briefPrompt(topic));
     currentArticle = articleResult;
     currentBrief   = briefResult;
     document.getElementById('article-output').innerHTML = formatOutput(articleResult);
