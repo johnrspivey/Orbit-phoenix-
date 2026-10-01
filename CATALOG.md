@@ -30,12 +30,13 @@
 - **Skipper self-repair** — SSH migration done; SHA fix SHIPPED (June 10); next: self_update, Lifeboat, create_repo, send_email
 - **Skipper tool expansion** — Stripe, Supabase, email, Telegram push first; Cloudflare/Namecheap later
 - **PROJECT.md at all repo roots** — highest-value ICM step, pending
-- **Health monitoring** — /health + UptimeRobot + Telegram across products, pending; Best Price Tires queued
+- **Ship Gate** — automated tests on every push + live checks via watchdog + plain-English pass/fail to ntfy; spec in SHIP-GATE.md; first target Missed Call Text Back (mock mode); replaces the old "Health monitoring — /health + UptimeRobot + Telegram" item; Best Price Tires still queued for live checks — PLANNED (Oct 1, 2026)
 - **GNN Episode 1** — pilot script written; production pipeline undefined
 - **DC Dogs** — series bible complete (Word doc); pipeline undefined
 - **EverFresh** — concept brief done; PROVISIONAL PATENT NOT FILED (~$320, do before wider sharing)
 
 ## CONCEPTS (designed, no code)
+- **Claude–Grok Roundtable** — Skipper endpoint calls Anthropic + xAI APIs, models answer each other for a few rounds, transcript saved to repo; est. $0.20–0.50/session on mid-tier models; hard spend caps in both consoles; interim: Claude writes to public repo file, Grok reads raw URL (Oct 1, 2026)
 - **Emerald City** — 9-product civic intelligence ecosystem; intelligence utility with civic conscience; exit target $5–15M in ~18mo; anti-kill provisions; Analyzer = proof of concept. Flagship: Flashpoints. Owns citizensurvey.online
 - **Site-in-a-Day machine** — speak a niche → live site + staged articles; fall 2026 v1; ladder: sell time → rent machine ($49–99/mo) → sell machine
 - **Skipper commercialization** — sell the fitting not the code; vertical configs (blogger/dev/ecom/compliance-SMB offline); $29–49/mo keep-alive retainer = recurring layer
