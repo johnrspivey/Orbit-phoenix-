@@ -4,7 +4,7 @@ const { createApp, checkSecret } = require("./app");
 const SECRET = process.env.SKIPPER_SECRET;
 const problem = checkSecret(SECRET);
 if (problem) {
-  console.error("Skipper refusing to start: " + problem + ". Generate one with: openssl rand -hex 32");
+  console.error("Skipper refusing to start: " + problem + ". Generate one with: openssl rand -base64 48 | tr -dc A-Za-z0-9");
   process.exit(1);
 }
 

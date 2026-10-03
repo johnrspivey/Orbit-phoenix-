@@ -75,6 +75,14 @@ const badHooks = [
   "file:///etc/passwd",
   "http://127.0.0.1:3400/mcp",
   "",
+  // encoded characters or backslashes in the hook path
+  "https://api.netlify.com/build_hooks/%2e%2e/api/v1/sites",
+  "https://api.netlify.com/build_hooks/abc%2Fdeploys",
+  "https://api.netlify.com/build_hooks/%61bc",
+  "https://api.netlify.com/build_hooks/abc%",
+  "https://api.netlify.com/build_hooks/..\\..\\api/v1/sites",
+  "https://api.netlify.com/build_hooks/../api/v1/sites",
+  "https://api.netlify.com/build_hooks/abc/extra",
 ];
 for (const hook of badHooks) {
   test("netlify_deploy rejects " + JSON.stringify(hook), async () => {
@@ -92,6 +100,18 @@ test("netlify_deploy accepts a real Netlify build hook", async () => {
   const result = parseRpc(await callTool(app, "netlify_deploy", { hook_url: hook })).result;
   assert.ok(!result.isError);
   assert.strictEqual(result.content[0].text, "Deploy triggered.");
-  assert.deepStrictEqual(http.post.mock.calls[0].arguments, [hook]);
+  const [url, body, config] = http.post.mock.calls[0].arguments;
+  assert.strictEqual(url, hook);
+  assert.strictEqual(body, undefined);
+  assert.strictEqual(config.maxRedirects, 0, "redirects must not be followed");
+  done();
+});
+
+test("netlify_deploy still allows a query string on a valid hook", async () => {
+  const { app, http, done } = setup();
+  const hook = "https://api.netlify.com/build_hooks/abc123?trigger_title=skipper";
+  const result = parseRpc(await callTool(app, "netlify_deploy", { hook_url: hook })).result;
+  assert.ok(!result.isError);
+  assert.strictEqual(http.post.mock.callCount(), 1);
   done();
 });

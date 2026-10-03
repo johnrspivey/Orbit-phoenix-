@@ -26,6 +26,22 @@ test("server refuses to start when SKIPPER_SECRET is shorter than 32 characters"
   assert.ok(!r.stderr.includes(short), "the bad secret itself is not printed");
 });
 
+test("server refuses a long but weak secret (fewer than 16 different characters)", () => {
+  const weak = "abcdefghijklmnop".slice(0, 15).repeat(3); // 45 chars, 15 unique
+  const r = spawnSync(process.execPath, [SERVER], { env: envWithout({ PORT: "0", SKIPPER_SECRET: weak }), encoding: "utf8", timeout: 10000 });
+  assert.strictEqual(r.status, 1);
+  assert.match(r.stderr, /too weak: it needs at least 16 different characters/);
+  assert.ok(!r.stderr.includes(weak));
+  const aaaa = spawnSync(process.execPath, [SERVER], { env: envWithout({ PORT: "0", SKIPPER_SECRET: "a".repeat(64) }), encoding: "utf8", timeout: 10000 });
+  assert.strictEqual(aaaa.status, 1);
+});
+
+test("checkSecret accepts exactly 16 different characters and rejects 15", () => {
+  const { checkSecret } = require("../app");
+  assert.strictEqual(checkSecret("0123456789abcdef".repeat(2)), null);
+  assert.match(checkSecret("0123456789abcde".repeat(3)), /too weak/);
+});
+
 test("with a good secret it listens on 127.0.0.1 only, and its output never shows the secret", async () => {
   const child = spawn(process.execPath, [SERVER], { env: envWithout({ PORT: "0", SKIPPER_SECRET: SECRET }) });
   let out = "";

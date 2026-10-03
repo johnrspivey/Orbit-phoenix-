@@ -32,3 +32,28 @@ test("redactUrl keeps harmless URLs readable", () => {
   assert.strictEqual(redactUrl("/mcp", SECRET), "/mcp");
   assert.strictEqual(redactUrl("/mcp/abc?q=1", SECRET), "/mcp/[redacted]");
 });
+
+test("malformed percent-encoding in /mcp/<secret> never puts the secret in the logs", async () => {
+  const lines = [];
+  const capture = (...a) => lines.push(a.map(String).join(" "));
+  const app = createApp({ secret: SECRET, log: capture, logError: capture });
+  const partEncoded = "%74" + SECRET.slice(1); // "t" written as %74
+  const paths = [
+    "/mcp/" + SECRET + "%",
+    "/mcp/" + SECRET + "%zz",
+    "/mcp/%zz" + SECRET,
+    "/mcp/%E0%A4%A" + SECRET,
+    "/mcp/" + partEncoded + "%",
+    "/MCP/" + SECRET + "%G0",
+    "/other/" + partEncoded + "%",
+    "/other/%zz/" + SECRET,
+    "/mcp%2F" + SECRET + "%",
+  ];
+  for (const p of paths) {
+    const res = await rpc(app, p, { jsonrpc: "2.0", id: 1, method: "tools/list", params: {} });
+    assert.ok(!res.text.includes(SECRET), "secret echoed in response for " + p);
+  }
+  assert.ok(lines.length >= paths.length);
+  const fragment = SECRET.slice(1); // catches partly-encoded copies too
+  for (const line of lines) assert.ok(!line.includes(fragment), "secret leaked into log line: " + line);
+});

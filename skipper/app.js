@@ -7,6 +7,10 @@ const { StreamableHTTPServerTransport } = require("@modelcontextprotocol/sdk/ser
 const { z } = require("zod");
 
 const MIN_SECRET_LENGTH = 32;
+const MIN_SECRET_UNIQUE_CHARS = 16;
+
+// github_read / github_write may only touch this account's repos.
+const GITHUB_OWNER = "johnrspivey";
 
 // The only PM2 processes pm2_restart may touch. Anything else is refused.
 const PM2_RESTART_ALLOWLIST = ["content-quarry-api", "gig-pig-api", "gig-pig-frontend"];
@@ -17,6 +21,8 @@ const NETLIFY_HOOK_PREFIX = "https://api.netlify.com/build_hooks/";
 function checkSecret(secret){
   if(typeof secret!=="string"||secret.length===0)return "SKIPPER_SECRET is not set";
   if(secret.length<MIN_SECRET_LENGTH)return "SKIPPER_SECRET must be at least "+MIN_SECRET_LENGTH+" characters (it is "+secret.length+")";
+  const unique=new Set(secret).size;
+  if(unique<MIN_SECRET_UNIQUE_CHARS)return "SKIPPER_SECRET is too weak: it needs at least "+MIN_SECRET_UNIQUE_CHARS+" different characters (it has "+unique+")";
   return null;
 }
 
@@ -29,21 +35,60 @@ function secretMatches(expected,provided){
   return crypto.timingSafeEqual(a,b);
 }
 
+// Decodes every well-formed %XX on its own, so one malformed escape elsewhere in the
+// string can't stop the rest from being decoded (decodeURIComponent is all-or-nothing).
+function lenientDecode(str){
+  let cur=String(str);
+  for(let i=0;i<5;i++){
+    const next=cur.replace(/%([0-9a-f]{2})/gi,(m,h)=>String.fromCharCode(parseInt(h,16)));
+    if(next===cur)break;
+    cur=next;
+  }
+  return cur;
+}
+
 // What gets written to the request log: no query string, and anything after /mcp/ hidden.
 function redactUrl(url,secret){
   const path=String(url).split("?")[0].replace(/(\/mcp\/)[^/]*/gi,"$1[redacted]");
-  let decoded=path;
-  try{decoded=decodeURIComponent(path);}catch(e){}
-  if(secret&&(path.includes(secret)||decoded.includes(secret)))return "[redacted]";
+  if(secret&&(path.includes(secret)||lenientDecode(path).includes(secret)))return "[redacted]";
   return path;
+}
+
+// Rejects "..", backslashes and percent-encoded dots, slashes or backslashes, checked on
+// the raw value and again after each round of decoding. Malformed encoding is rejected too.
+function isSafeGithubPart(value,{allowSlash}){
+  if(typeof value!=="string"||value.length===0)return false;
+  let cur=value;
+  for(let i=0;i<5;i++){
+    if(cur.includes("..")||cur.includes("\\")||/%(2e|2f|5c)/i.test(cur))return false;
+    if(!allowSlash&&cur.includes("/"))return false;
+    let next;
+    try{next=decodeURIComponent(cur);}catch(e){return false;}
+    if(next===cur)break;
+    cur=next;
+  }
+  // No empty or "." segments either ("a//b", "./x").
+  return cur.split("/").every(seg=>seg!==""&&seg!==".");
+}
+
+// Validates owner/repo/path and builds the contents URL with every segment encoded.
+// Returns null if anything is not allowed.
+function githubContentsUrl(owner,repo,path){
+  if(owner!==GITHUB_OWNER)return null;
+  if(!isSafeGithubPart(repo,{allowSlash:false})||!isSafeGithubPart(path,{allowSlash:true}))return null;
+  const encodedPath=path.split("/").map(encodeURIComponent).join("/");
+  return "https://api.github.com/repos/"+encodeURIComponent(owner)+"/"+encodeURIComponent(repo)+"/contents/"+encodedPath;
 }
 
 function isAllowedNetlifyHook(hookUrl){
   if(typeof hookUrl!=="string"||!hookUrl.startsWith(NETLIFY_HOOK_PREFIX))return false;
+  // No encoded characters or backslashes in the path part (before any ? or #).
+  const rawPath=hookUrl.split(/[?#]/)[0];
+  if(rawPath.includes("%")||rawPath.includes("\\"))return false;
   let u;
   try{u=new URL(hookUrl);}catch(e){return false;}
   return u.protocol==="https:"&&u.hostname==="api.netlify.com"&&u.port===""&&
-    u.username===""&&u.password===""&&u.pathname.startsWith("/build_hooks/");
+    u.username===""&&u.password===""&&/^\/build_hooks\/[A-Za-z0-9_-]+$/.test(u.pathname);
 }
 
 function errorResult(text){
@@ -63,13 +108,8 @@ function createApp(options={}){
 
   const app=express();
   app.use((req,res,next)=>{log(req.method,redactUrl(req.originalUrl,secret));next();});
-  app.use((req,res,next)=>{
-    res.header("Access-Control-Allow-Origin","*");
-    res.header("Access-Control-Allow-Headers","x-skipper-secret, Content-Type, mcp-session-id");
-    res.header("Access-Control-Allow-Methods","GET, POST, DELETE, OPTIONS");
-    if(req.method==="OPTIONS")return res.sendStatus(200);
-    next();
-  });
+  // No CORS headers: the claude.ai connector calls us server-to-server, so browsers
+  // on other sites get no permission to call Skipper.
 
   app.get("/ping",(req,res)=>res.json({status:"Skipper is running",time:new Date().toISOString()}));
 
@@ -103,24 +143,28 @@ function createApp(options={}){
     },
 
     github_read: async ({owner,repo,path})=>{
+      const url=githubContentsUrl(owner,repo,path);
+      if(!url)return errorResult("Refused: owner must be "+GITHUB_OWNER+" and repo/path may not contain '..', backslashes or encoded dots/slashes");
       try{
-        const r=await http.get("https://api.github.com/repos/"+owner+"/"+repo+"/contents/"+path,{headers:{Authorization:"token "+GITHUB_TOKEN,Accept:"application/vnd.github.v3+json"}});
+        const r=await http.get(url,{headers:{Authorization:"token "+GITHUB_TOKEN,Accept:"application/vnd.github.v3+json"}});
         return{content:[{type:"text",text:JSON.stringify({content:Buffer.from(r.data.content,"base64").toString("utf8"),sha:r.data.sha})}]};
       }catch(e){return{content:[{type:"text",text:"GitHub error: "+(e.response?JSON.stringify(e.response.data):e.message)}]};}
     },
 
     github_write: async ({owner,repo,path,content,message,sha})=>{
+      const url=githubContentsUrl(owner,repo,path);
+      if(!url)return errorResult("Refused: owner must be "+GITHUB_OWNER+" and repo/path may not contain '..', backslashes or encoded dots/slashes");
       try{
         const payload={message,content:Buffer.from(content).toString("base64")};
         if(sha)payload.sha=sha;
-        const r=await http.put("https://api.github.com/repos/"+owner+"/"+repo+"/contents/"+path,payload,{headers:{Authorization:"token "+GITHUB_TOKEN,Accept:"application/vnd.github.v3+json"}});
+        const r=await http.put(url,payload,{headers:{Authorization:"token "+GITHUB_TOKEN,Accept:"application/vnd.github.v3+json"}});
         return{content:[{type:"text",text:"Committed. SHA: "+r.data.commit.sha}]};
       }catch(e){return{content:[{type:"text",text:"GitHub error: "+(e.response?JSON.stringify(e.response.data):e.message)}]};}
     },
 
     netlify_deploy: async ({hook_url})=>{
       if(!isAllowedNetlifyHook(hook_url))return errorResult("Refused: hook_url must start with "+NETLIFY_HOOK_PREFIX);
-      try{await http.post(hook_url);return{content:[{type:"text",text:"Deploy triggered."}]};}
+      try{await http.post(hook_url,undefined,{maxRedirects:0});return{content:[{type:"text",text:"Deploy triggered."}]};}
       catch(e){return{content:[{type:"text",text:"Deploy error: "+e.message}]};}
     }
   };
@@ -155,9 +199,13 @@ function createApp(options={}){
   app.get(mcpPaths,requireSecret,methodNotAllowed);
   app.delete(mcpPaths,requireSecret,methodNotAllowed);
 
-  // Malformed JSON etc: answer without a stack trace and without logging the URL.
+  // Plain 404: Express's default page would echo the requested URL back.
+  app.use((req,res)=>res.status(404).end());
+
+  // Malformed JSON, bad %-encoding, etc. Error messages can quote the URL (and so the
+  // secret), so only the status is logged, never err.message.
   app.use((err,req,res,next)=>{
-    logError("Request error:",err&&err.message);
+    logError("Request error: status "+(err&&err.status||500));
     if(res.headersSent)return next(err);
     const status=err&&err.status>=400&&err.status<500?err.status:500;
     res.status(status).json({jsonrpc:"2.0",error:{code:status===500?-32603:-32700,message:status===500?"Internal server error":"Bad request"},id:null});
@@ -166,4 +214,4 @@ function createApp(options={}){
   return app;
 }
 
-module.exports={createApp,checkSecret,secretMatches,redactUrl,isAllowedNetlifyHook,PM2_RESTART_ALLOWLIST,NETLIFY_HOOK_PREFIX,MIN_SECRET_LENGTH};
+module.exports={createApp,checkSecret,secretMatches,redactUrl,isAllowedNetlifyHook,isSafeGithubPart,githubContentsUrl,GITHUB_OWNER,MIN_SECRET_UNIQUE_CHARS,PM2_RESTART_ALLOWLIST,NETLIFY_HOOK_PREFIX,MIN_SECRET_LENGTH};
