@@ -5,7 +5,7 @@ const { createApp } = require("../app");
 const { parseRpc, callTool, SECRET } = require("./helpers");
 
 function setup() {
-  const execFile = mock.fn((file, args, cb) => cb(null, "", ""));
+  const execFile = mock.fn((file, args, opts, cb) => cb(null, "", ""));
   const http = { post: mock.fn(async () => ({})), get: mock.fn(), put: mock.fn() };
   // If anything reaches for a shell-based API, these spies will record it.
   const shellSpies = ["exec", "execSync", "spawn", "spawnSync", "execFileSync"].map((m) =>
@@ -39,10 +39,11 @@ for (const good of ["content-quarry-api", "gig-pig-api", "gig-pig-frontend"]) {
     assert.ok(!result.isError);
     assert.strictEqual(result.content[0].text, "Restarted " + good);
     assert.strictEqual(execFile.mock.callCount(), 1);
-    const [file, args, maybeOpts] = execFile.mock.calls[0].arguments;
+    const [file, args, opts, cb] = execFile.mock.calls[0].arguments;
     assert.strictEqual(file, "pm2");
     assert.deepStrictEqual(args, ["restart", good]);
-    assert.strictEqual(typeof maybeOpts, "function", "no options object, so no shell:true");
+    assert.strictEqual(typeof cb, "function");
+    assert.deepStrictEqual(Object.keys(opts), ["env"], "only env is set, so no shell:true");
     done();
   });
 }
@@ -55,7 +56,7 @@ test("the real default for execFile is child_process.execFile, not exec", () => 
 
 test("pm2_status also uses execFile", async () => {
   const { done } = setup();
-  const execFile = mock.fn((file, args, cb) =>
+  const execFile = mock.fn((file, args, opts, cb) =>
     cb(null, JSON.stringify([{ name: "x", pm2_env: { status: "online", restart_time: 0 }, monit: { memory: 1048576, cpu: 1 } }]), "")
   );
   const app = createApp({ secret: SECRET, execFile, log: () => {}, logError: () => {} });
@@ -83,6 +84,16 @@ const badHooks = [
   "https://api.netlify.com/build_hooks/..\\..\\api/v1/sites",
   "https://api.netlify.com/build_hooks/../api/v1/sites",
   "https://api.netlify.com/build_hooks/abc/extra",
+  // query options other than trigger_title
+  "https://api.netlify.com/build_hooks/abc123?trigger_branch=evil",
+  "https://api.netlify.com/build_hooks/abc123?trigger_title=x&trigger_branch=evil",
+  "https://api.netlify.com/build_hooks/abc123?trigger_branch=evil&trigger_title=x",
+  "https://api.netlify.com/build_hooks/abc123?trigger%5Fbranch=evil",
+  "https://api.netlify.com/build_hooks/abc123?TRIGGER_BRANCH=evil",
+  "https://api.netlify.com/build_hooks/abc123?clear_cache=true",
+  "https://api.netlify.com/build_hooks/abc123?trigger_title=a;trigger_branch=evil",
+  "https://api.netlify.com/build_hooks/abc123?trigger_title=a&trigger_title=b",
+  "https://api.netlify.com/build_hooks/abc123?foo",
 ];
 for (const hook of badHooks) {
   test("netlify_deploy rejects " + JSON.stringify(hook), async () => {
@@ -114,4 +125,47 @@ test("netlify_deploy still allows a query string on a valid hook", async () => {
   assert.ok(!result.isError);
   assert.strictEqual(http.post.mock.callCount(), 1);
   done();
+});
+
+for (const hook of [
+  "https://api.netlify.com/build_hooks/abc123",
+  "https://api.netlify.com/build_hooks/abc123?",
+  "https://api.netlify.com/build_hooks/abc123?trigger_title=Deployed%20by%20Skipper",
+]) {
+  test("netlify_deploy allows " + JSON.stringify(hook), async () => {
+    const { app, http, done } = setup();
+    const result = parseRpc(await callTool(app, "netlify_deploy", { hook_url: hook })).result;
+    assert.ok(!result.isError, JSON.stringify(result));
+    assert.strictEqual(http.post.mock.callCount(), 1);
+    done();
+  });
+}
+
+test("pm2 gets only PATH, HOME and PM2_HOME, never SKIPPER_SECRET or GITHUB_TOKEN", async () => {
+  const saved = { ...process.env };
+  Object.assign(process.env, {
+    SKIPPER_SECRET: SECRET, GITHUB_TOKEN: "ghp_should_not_leak", OTHER_SETTING: "nope",
+    PATH: "/usr/bin:/bin", HOME: "/root", PM2_HOME: "/root/.pm2",
+  });
+  try {
+    const { app, execFile, done } = setup();
+    await callTool(app, "pm2_restart", { name: "gig-pig-api" });
+    await callTool(app, "pm2_status", {});
+    assert.strictEqual(execFile.mock.callCount(), 2);
+    for (const call of execFile.mock.calls) {
+      const env = call.arguments[2].env;
+      assert.deepStrictEqual(env, { PATH: "/usr/bin:/bin", HOME: "/root", PM2_HOME: "/root/.pm2" });
+      assert.ok(!("SKIPPER_SECRET" in env) && !("GITHUB_TOKEN" in env));
+      assert.ok(!JSON.stringify(env).includes(SECRET) && !JSON.stringify(env).includes("ghp_should_not_leak"));
+    }
+    done();
+  } finally {
+    for (const k of Object.keys(process.env)) if (!(k in saved)) delete process.env[k];
+    Object.assign(process.env, saved);
+  }
+});
+
+test("pm2 env leaves out PM2_HOME when it isn't set (pm2 then uses ~/.pm2)", () => {
+  const { pm2Env } = require("../app");
+  assert.deepStrictEqual(pm2Env({ PATH: "/bin", HOME: "/h", GITHUB_TOKEN: "x" }), { PATH: "/bin", HOME: "/h" });
 });

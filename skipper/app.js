@@ -80,6 +80,18 @@ function githubContentsUrl(owner,repo,path){
   return "https://api.github.com/repos/"+encodeURIComponent(owner)+"/"+encodeURIComponent(repo)+"/contents/"+encodedPath;
 }
 
+// Environment handed to pm2: only what it needs to find itself and its daemon.
+// Skipper's own settings (SKIPPER_SECRET, GITHUB_TOKEN, ...) are never passed on.
+const PM2_ENV_KEYS = ["PATH", "HOME", "PM2_HOME"];
+function pm2Env(source=process.env){
+  const env={};
+  for(const k of PM2_ENV_KEYS)if(typeof source[k]==="string")env[k]=source[k];
+  return env;
+}
+
+// The only query option a build hook may carry.
+const NETLIFY_ALLOWED_QUERY = ["trigger_title"];
+
 function isAllowedNetlifyHook(hookUrl){
   if(typeof hookUrl!=="string"||!hookUrl.startsWith(NETLIFY_HOOK_PREFIX))return false;
   // No encoded characters or backslashes in the path part (before any ? or #).
@@ -87,8 +99,16 @@ function isAllowedNetlifyHook(hookUrl){
   if(rawPath.includes("%")||rawPath.includes("\\"))return false;
   let u;
   try{u=new URL(hookUrl);}catch(e){return false;}
-  return u.protocol==="https:"&&u.hostname==="api.netlify.com"&&u.port===""&&
-    u.username===""&&u.password===""&&/^\/build_hooks\/[A-Za-z0-9_-]+$/.test(u.pathname);
+  if(!(u.protocol==="https:"&&u.hostname==="api.netlify.com"&&u.port===""&&
+    u.username===""&&u.password===""&&/^\/build_hooks\/[A-Za-z0-9_-]+$/.test(u.pathname)))return false;
+  // Query: only trigger_title, at most once. Keys are compared after decoding, so
+  // trigger%5Fbranch is still trigger_branch. ";" is refused because some servers
+  // treat it as a separator that URLSearchParams doesn't.
+  if(u.search.includes(";"))return false;
+  const keys=[...u.searchParams.keys()];
+  if(keys.some(k=>!NETLIFY_ALLOWED_QUERY.includes(k)))return false;
+  if(new Set(keys).size!==keys.length)return false;
+  return true;
 }
 
 function errorResult(text){
@@ -123,7 +143,7 @@ function createApp(options={}){
   // Tool handlers defined ONCE at startup — not recreated per request
   const tools={
     pm2_status: async () => new Promise((resolve,reject)=>{
-      execFile("pm2",["jlist"],(err,stdout)=>{
+      execFile("pm2",["jlist"],{env:pm2Env()},(err,stdout)=>{
         if(err)return reject(new Error(err.message));
         try{
           const s=JSON.parse(stdout).map(p=>({name:p.name,status:p.pm2_env.status,restarts:p.pm2_env.restart_time,memoryMB:Math.round(p.monit.memory/1024/1024),cpu:p.monit.cpu}));
@@ -135,7 +155,7 @@ function createApp(options={}){
     pm2_restart: async ({name}) => {
       if(!PM2_RESTART_ALLOWLIST.includes(name))return errorResult("Refused: pm2_restart only accepts "+PM2_RESTART_ALLOWLIST.join(", "));
       return new Promise((resolve,reject)=>{
-        execFile("pm2",["restart",name],(err)=>{
+        execFile("pm2",["restart",name],{env:pm2Env()},(err)=>{
           if(err)return reject(new Error(err.message));
           resolve({content:[{type:"text",text:"Restarted "+name}]});
         });
@@ -214,4 +234,4 @@ function createApp(options={}){
   return app;
 }
 
-module.exports={createApp,checkSecret,secretMatches,redactUrl,isAllowedNetlifyHook,isSafeGithubPart,githubContentsUrl,GITHUB_OWNER,MIN_SECRET_UNIQUE_CHARS,PM2_RESTART_ALLOWLIST,NETLIFY_HOOK_PREFIX,MIN_SECRET_LENGTH};
+module.exports={createApp,checkSecret,secretMatches,redactUrl,isAllowedNetlifyHook,isSafeGithubPart,githubContentsUrl,pm2Env,PM2_ENV_KEYS,GITHUB_OWNER,MIN_SECRET_UNIQUE_CHARS,PM2_RESTART_ALLOWLIST,NETLIFY_HOOK_PREFIX,MIN_SECRET_LENGTH};
